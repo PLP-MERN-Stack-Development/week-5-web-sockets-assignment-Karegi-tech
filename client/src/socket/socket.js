@@ -1,114 +1,95 @@
-// socket.js - Socket.io client setup
+// socket.js
 
 import { io } from 'socket.io-client';
 import { useEffect, useState } from 'react';
 
-// Socket.io connection URL
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-// Create socket instance
 export const socket = io(SOCKET_URL, {
   autoConnect: false,
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 1000,
+  transports: ['websocket'],
 });
 
-// Custom hook for using socket.io
 export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(socket.connected);
-  const [lastMessage, setLastMessage] = useState(null);
   const [messages, setMessages] = useState([]);
   const [users, setUsers] = useState([]);
   const [typingUsers, setTypingUsers] = useState([]);
 
-  // Connect to socket server
   const connect = (username) => {
     socket.connect();
-    if (username) {
-      socket.emit('user_join', username);
-    }
+    socket.emit('user_join', username);
   };
 
-  // Disconnect from socket server
   const disconnect = () => {
     socket.disconnect();
   };
 
-  // Send a message
-  const sendMessage = (message) => {
-    socket.emit('send_message', { message });
+  const sendMessage = (text) => {
+    const message = {
+      message: text,
+      timestamp: new Date().toISOString(),
+    };
+    socket.emit('send_message', message);
   };
 
-  // Send a private message
-  const sendPrivateMessage = (to, message) => {
-    socket.emit('private_message', { to, message });
+  const sendPrivateMessage = (to, text) => {
+    socket.emit('private_message', {
+      to,
+      message: text,
+    });
   };
 
-  // Set typing status
   const setTyping = (isTyping) => {
     socket.emit('typing', isTyping);
   };
 
-  // Socket event listeners
   useEffect(() => {
-    // Connection events
     const onConnect = () => {
+      console.log('✅ Connected to socket');
       setIsConnected(true);
     };
 
     const onDisconnect = () => {
+      console.log('❌ Disconnected from socket');
       setIsConnected(false);
     };
 
-    // Message events
-    const onReceiveMessage = (message) => {
-      setLastMessage(message);
-      setMessages((prev) => [...prev, message]);
+    const onReceiveMessage = (msg) => {
+      setMessages((prev) => [...prev, msg]);
     };
 
-    const onPrivateMessage = (message) => {
-      setLastMessage(message);
-      setMessages((prev) => [...prev, message]);
+    const onPrivateMessage = (msg) => {
+      msg.isPrivate = true;
+      setMessages((prev) => [...prev, msg]);
     };
 
-    // User events
-    const onUserList = (userList) => {
-      setUsers(userList);
-    };
+    const onUserList = (list) => setUsers(list);
 
     const onUserJoined = (user) => {
-      // You could add a system message here
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          system: true,
-          message: `${user.username} joined the chat`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      const joinMsg = {
+        id: Date.now(),
+        system: true,
+        message: `${user.username} joined the chat`,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, joinMsg]);
     };
 
     const onUserLeft = (user) => {
-      // You could add a system message here
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now(),
-          system: true,
-          message: `${user.username} left the chat`,
-          timestamp: new Date().toISOString(),
-        },
-      ]);
+      const leaveMsg = {
+        id: Date.now(),
+        system: true,
+        message: `${user.username} left the chat`,
+        timestamp: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, leaveMsg]);
     };
 
-    // Typing events
-    const onTypingUsers = (users) => {
-      setTypingUsers(users);
+    const onTypingUsers = (typingList) => {
+      setTypingUsers(typingList);
     };
 
-    // Register event listeners
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('receive_message', onReceiveMessage);
@@ -118,7 +99,6 @@ export const useSocket = () => {
     socket.on('user_left', onUserLeft);
     socket.on('typing_users', onTypingUsers);
 
-    // Clean up event listeners
     return () => {
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
@@ -134,7 +114,6 @@ export const useSocket = () => {
   return {
     socket,
     isConnected,
-    lastMessage,
     messages,
     users,
     typingUsers,
@@ -146,4 +125,4 @@ export const useSocket = () => {
   };
 };
 
-export default socket; 
+export default socket;
